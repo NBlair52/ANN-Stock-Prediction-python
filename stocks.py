@@ -20,7 +20,7 @@ BACK_SAMPLES_NUM = 12                                     ##Not sure how many to
 DELTA_CUTOFF = 0.0001                                     ##Not sure what level.
 
 URL_BASE = 'http://ichart.finance.yahoo.com/table.csv?s=' 
-OUTPUT_BASE = 'C:\Python27\Stocks'
+OUTPUT_BASE = 'C:\Python27\ANN-Stock-Prediction'
 
 TODAY = date.today()
 ONE_DAY = timedelta(days=1)
