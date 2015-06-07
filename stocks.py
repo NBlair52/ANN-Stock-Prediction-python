@@ -3,7 +3,7 @@ from csv import reader, Error
 from datetime import date, timedelta
 from os import getcwd
 from pybrain.tools.shortcuts import buildNetwork
-#from pybrain import FeedForwardNetwork, buildNetwork
+#from pybrain import FeedForwardNetwork
 from pybrain.datasets import SupervisedDataSet
 from pybrain.structure import LinearLayer, TanhLayer, FullConnection
 from pybrain.supervised.trainers import BackpropTrainer
@@ -19,7 +19,7 @@ MIDDLE_NUM = 5*PARAMETERS_NUM                           ##Not sure how many to u
 LAYERS_NUM = 3                                           ##Not sure how many to use.  Ballance memory and compuation power?
 BACK_SAMPLES_NUM = 12                                     ##Not sure how many to use.
 DELTA_CUTOFF = 0.00001                                     ##Not sure what level.
-
+ERROR_MAX = 0.0005
 URL_BASE = 'http://ichart.finance.yahoo.com/table.csv?s=' 
 OUTPUT_BASE = getcwd()
 
@@ -188,11 +188,14 @@ def main():
         network = buildNetwork(PARAMETERS_NUM, MIDDLE_NUM, 1, bias=True, hiddenclass=TanhLayer)
         trainer = BackpropTrainer(network, dataSet)
         delta, error_prev, error_curr = 1, 1, 1
-        while delta > DELTA_CUTOFF:
+        '''while delta > DELTA_CUTOFF:
             error_prev = error_curr
             error_curr = trainer.train()
             delta = abs((error_prev - error_curr) / error_prev)
-
+        '''
+        error = 100
+        while (error > ERROR_MAX):
+            error = trainer.train()
         # this one seems to take too long trainer.trainUntilConvergence()
 
         # Activate network on most recent week's data

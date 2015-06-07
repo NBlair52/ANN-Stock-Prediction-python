@@ -7,9 +7,8 @@ def sigma(bot, top, inc=1):
 
 class Stock_Day():
     """
-    The class to hold information about a stock's preformance on each day
+
     """
-    
     def __init__(self, date, start, high, low, end, volume, adj_end):
         self.date = date
         self.start = start
@@ -21,6 +20,9 @@ class Stock_Day():
 
         self.spread = high - low
         self.change = (start - end) / start
+
+    def return_metrics(self):
+        return self.start, self.high, self.low, self.end, self.volume, self.adj_end
     
 #    def __init__(self):
 
