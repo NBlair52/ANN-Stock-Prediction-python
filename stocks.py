@@ -1,11 +1,12 @@
 #IMPORTS
 from csv import reader, Error
 from datetime import date, timedelta
-from pybrain import RecurrentNetwork
+from os import getcwd
+from pybrain.tools.shortcuts import buildNetwork
+#from pybrain import FeedForwardNetwork, buildNetwork
 from pybrain.datasets import SupervisedDataSet
 from pybrain.structure import LinearLayer, TanhLayer, FullConnection
 from pybrain.supervised.trainers import BackpropTrainer
-from random import gauss
 from urllib import urlretrieve, ContentTooShortError
 
 from stock_week import Stock_Week, Stock_Day
@@ -14,13 +15,13 @@ from stock_week import Stock_Week, Stock_Day
 STOCK_TICKS = ['GOOG', 'AAPL']                ##Stocks to look up, Might change this later to be a file to read in
 PARAMETERS_NAME = ['Start', 'High', 'Low', 'End', 'Ave_volume', 'sMA', 'gMA']
 PARAMETERS_NUM = len(PARAMETERS_NAME)
-MIDDLE_NUM = PARAMETERS_NUM                           ##Not sure how many to use.  Ballance memory and compuation power?
-LAYERS_NUM = 5                                           ##Not sure how many to use.  Ballance memory and compuation power?
+MIDDLE_NUM = 5*PARAMETERS_NUM                           ##Not sure how many to use.  Ballance memory and compuation power?
+LAYERS_NUM = 3                                           ##Not sure how many to use.  Ballance memory and compuation power?
 BACK_SAMPLES_NUM = 12                                     ##Not sure how many to use.
-DELTA_CUTOFF = 0.0001                                     ##Not sure what level.
+DELTA_CUTOFF = 0.00001                                     ##Not sure what level.
 
 URL_BASE = 'http://ichart.finance.yahoo.com/table.csv?s=' 
-OUTPUT_BASE = 'C:\Python27\ANN-Stock-Prediction'
+OUTPUT_BASE = getcwd()
 
 TODAY = date.today()
 ONE_DAY = timedelta(days=1)
@@ -112,21 +113,46 @@ def package_week(stock, day):
 #    return gauss(50, 25), gauss(0, 3)
 
 # Functions to setup and load network and dataSet
-def setup_network(input_num, middle_num, layers, output_num):
-    network = RecurrentNetwork()
+'''
+def setup_network(input_num, middle_num, layer_num, output_num):
+    network = FeedForwardNetwork()
     network.addInputModule(LinearLayer(input_num, 'in'))
-    name_prev, name_curr = 'in', 'mid1'
-    for i in range (1, layers + 1):
-        network.addModule(TanhLayer(middle_num, name_curr))
+    name_prev, name_curr = 'in', 'mid0'
+    for i in range (0, layer_num):
+        #network.addModule(TanhLayer(middle_num, name_curr))
+        network.addModule(LinearLayer(middle_num, name_curr))
         network.addConnection(FullConnection(network[name_prev], network[name_curr], name='F'+name_prev+'-'+name_curr))
-        if (i != 1):
-            network.addRecurrentConnection(FullConnection(network[name_curr], network[name_curr], name='R'+name_curr))
+        #if (i != 1):
+        #    network.addRecurrentConnection(FullConnection(network[name_curr], network[name_curr], name='R'+name_curr))
         name_prev, name_curr = name_curr, 'mid' + str(i+1)
     network.addOutputModule(LinearLayer(output_num, 'out'))
     network.addConnection(FullConnection(network[name_prev], network['out'], name='F'+name_prev+'-out'))
     network.sortModules()
     #make fast
     return network
+    '''
+def setup_network(input_num, middle_num, layer_num, output_num):
+    network = FeedForwardNetwork()
+
+    temp_layer = LinearLayer(input_num, 'in')
+    network.addInputModule(temp_layer)
+    layers = [temp_layer]
+    for i in range (0, layer_num):
+        temp_layer = LinearLayer(middle_num, 'mid'+str(i))
+        network.addModule(temp_layer)
+        layers.append(temp_layer)
+    temp_layer = LinearLayer(output_num, 'out')
+    network.addOutputModule(temp_layer)
+    layers.append(temp_layer)
+
+    temp_layer_new = layers[0]
+    for i in range (1, len(layers)):
+        temp_layer_old = temp_layer_new
+        temp_layer_new = layers[i]
+        temp_connection = FullConnection(temp_layer_old, temp_layer_new)
+        network.addConnection(temp_connection)
+
+    network.sortModules()
 
 def setup_dataSet(stock):
     friday = last_friday(TODAY)
@@ -139,7 +165,7 @@ def setup_dataSet(stock):
         week_present = package_week(stock, friday)
 
     dataSet = SupervisedDataSet(PARAMETERS_NUM, 1)
-    for weeks in range (BACK_SAMPLES_NUM):
+    for weeks in range (0, BACK_SAMPLES_NUM):
         friday -= ONE_WEEK
         week_past = package_week(stock, friday)
         if (week_past.num_days !=0):
@@ -152,22 +178,27 @@ def setup_dataSet(stock):
 def main():
     for stock in STOCK_TICKS:
         # Get offline
-        get_data(stock)
+        #get_data(stock)
 
         # Add to data set
         current_week_metrics, dataSet = setup_dataSet(stock)
 
         # Train network
-        network = setup_network(PARAMETERS_NUM, MIDDLE_NUM, LAYERS_NUM, 1)
+        # network = setup_network(PARAMETERS_NUM, MIDDLE_NUM, LAYERS_NUM, 1)
+        network = buildNetwork(PARAMETERS_NUM, MIDDLE_NUM, 1, bias=True, hiddenclass=TanhLayer)
         trainer = BackpropTrainer(network, dataSet)
         delta, error_prev, error_curr = 1, 1, 1
         while delta > DELTA_CUTOFF:
             error_prev = error_curr
             error_curr = trainer.train()
             delta = abs((error_prev - error_curr) / error_prev)
-        #trainer.trainUntilConvergence() this one seems to take too long
 
+        # this one seems to take too long trainer.trainUntilConvergence()
+
+        # Activate network on most recent week's data
         output = network.activate(current_week_metrics)
+
+        # Output prediction
         print stock + ': ' + str(output)
 
 if __name__ == "__main__":
